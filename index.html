@@ -594,6 +594,15 @@
               <div class="divider"></div>
               <div class="flex items-center justify-between">
                 <div>
+                  <div class="text-[14px] font-medium text-gray-800">Import from CSV Backup</div>
+                  <div class="text-[12px] text-gray-400 mt-0.5">Restore applications from a previously exported CSV</div>
+                </div>
+                <button class="btn btn-secondary btn-sm" onclick="document.getElementById('csv-import-input').click()">↑ Import CSV</button>
+                <input type="file" id="csv-import-input" accept=".csv" class="hidden" onchange="importCSV(this)" />
+              </div>
+              <div class="divider"></div>
+              <div class="flex items-center justify-between">
+                <div>
                   <div class="text-[14px] font-medium text-gray-800">Clear All Applications</div>
                   <div class="text-[12px] text-red-400 mt-0.5">This cannot be undone</div>
                 </div>
@@ -746,7 +755,7 @@
 <div class="modal-backdrop" id="resume-modal" onclick="closeOnBackdrop(event,'resume-modal')">
   <div class="modal-box" style="max-width:480px;">
     <div class="flex items-center justify-between px-6 py-5 border-b border-gray-100">
-      <h2 class="text-[16px] font-semibold text-gray-900">Add Resume</h2>
+      <h2 class="text-[16px] font-semibold text-gray-900" id="resume-modal-title">Add Resume</h2>
       <button class="btn btn-ghost p-1.5" onclick="closeResumeModal()">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
       </button>
@@ -769,7 +778,7 @@
         <input class="form-input" id="r-roles" placeholder="e.g. Research Analyst, Program Coordinator" />
       </div>
       <div class="form-group">
-        <label class="form-label">Upload PDF</label>
+        <label class="form-label">Upload PDF <span class="text-gray-400 font-normal">(optional — leave blank to keep existing)</span></label>
         <div class="border-2 border-dashed border-gray-200 rounded-lg p-5 text-center cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/30 transition-all" onclick="document.getElementById('r-file').click()">
           <div class="mb-1.5 text-gray-300"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></div>
           <div class="text-[13px] text-gray-500 font-medium" id="r-file-label">Click to upload resume PDF</div>
@@ -777,9 +786,12 @@
         </div>
         <input type="file" id="r-file" accept=".pdf,.doc,.docx" onchange="handleFileSelect(this)" class="hidden" />
       </div>
-      <div class="flex justify-end gap-2 pt-1">
-        <button class="btn btn-secondary" onclick="closeResumeModal()">Cancel</button>
-        <button class="btn btn-primary" onclick="saveResume()">Save Resume</button>
+      <div class="flex items-center gap-2 pt-1">
+        <button class="btn btn-danger btn-sm hidden" id="r-delete-btn" onclick="deleteCurrentResume()">Delete</button>
+        <div class="ml-auto flex gap-2">
+          <button class="btn btn-secondary" onclick="closeResumeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveResume()">Save Resume</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1336,19 +1348,35 @@ function renderVault(){
       </div>
       <div class="flex gap-2 pt-3 border-t border-gray-50">
         ${r.fileData?`<button class="btn btn-primary btn-sm flex-1" onclick="downloadResume(${i})">↓ Download</button>`:'<button class="btn btn-secondary btn-sm flex-1" disabled>No file</button>'}
+        <button class="btn btn-secondary btn-sm" onclick="openResumeModal('${r.id}')">Edit</button>
         <button class="btn btn-danger btn-sm" onclick="deleteResume(${i})">×</button>
       </div>
     </div>
   `).join('');
 }
 
-function openResumeModal(){
-  ['r-label','r-desc','r-tags','r-roles'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('r-file-label').textContent = 'Click to upload resume PDF';
+let editingResumeId = null;
+
+function openResumeModal(id){
+  editingResumeId = id || null;
+  const r = id ? resumes.find(x=>x.id===id) : null;
+
+  document.getElementById('resume-modal-title').textContent = r ? 'Edit Resume' : 'Add Resume';
+  document.getElementById('r-label').value = r?.label || '';
+  document.getElementById('r-desc').value  = r?.desc  || '';
+  document.getElementById('r-tags').value  = r ? (r.tags||[]).join(', ') : '';
+  document.getElementById('r-roles').value = '';
+
+  // Reset file input properly so it accepts a new upload every time
+  const fileInput = document.getElementById('r-file');
+  fileInput.value = '';
   selectedFile = null;
+  document.getElementById('r-file-label').textContent = r?.fileName ? 'Current: ' + r.fileName : 'Click to upload resume PDF';
+
+  document.getElementById('r-delete-btn').classList.toggle('hidden', !r);
   openModal('resume-modal');
 }
-function closeResumeModal(){ closeModal('resume-modal'); }
+function closeResumeModal(){ closeModal('resume-modal'); editingResumeId = null; }
 
 function handleFileSelect(input){
   const f = input.files[0];
@@ -1362,16 +1390,33 @@ function saveResume(){
   if(!label){ alert('Please add a label.'); return; }
   const tags  = document.getElementById('r-tags').value.split(',').map(t=>t.trim()).filter(Boolean);
   const roles = document.getElementById('r-roles').value.split(',').map(t=>t.trim()).filter(Boolean);
+  const allTags = [...new Set([...tags,...roles])];
 
   const commit = (fileData, fileName) => {
-    resumes.push({
-      id: Date.now().toString(), label,
-      desc: document.getElementById('r-desc').value.trim(),
-      tags: [...tags,...roles],
-      keywords: [...tags,...roles,label].join(' ').toLowerCase(),
-      date: new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}),
-      fileData, fileName
-    });
+    if(editingResumeId){
+      // Edit existing — keep old file if no new one uploaded
+      const idx = resumes.findIndex(r=>r.id===editingResumeId);
+      const existing = resumes[idx];
+      resumes[idx] = {
+        ...existing,
+        label,
+        desc: document.getElementById('r-desc').value.trim(),
+        tags: allTags,
+        keywords: [...allTags, label].join(' ').toLowerCase(),
+        fileData: fileData !== null ? fileData : existing.fileData,
+        fileName: fileName !== null ? fileName : existing.fileName,
+      };
+    } else {
+      // New resume
+      resumes.push({
+        id: Date.now().toString(), label,
+        desc: document.getElementById('r-desc').value.trim(),
+        tags: allTags,
+        keywords: [...allTags, label].join(' ').toLowerCase(),
+        date: new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}),
+        fileData, fileName
+      });
+    }
     saveResumes();
     closeResumeModal();
     renderVault();
@@ -1380,10 +1425,19 @@ function saveResume(){
   if(selectedFile){
     const reader = new FileReader();
     reader.onload = ev => commit(ev.target.result, selectedFile.name);
+    reader.onerror = () => { alert('File could not be read. Please try again.'); };
     reader.readAsDataURL(selectedFile);
   } else {
     commit(null, null);
   }
+}
+
+function deleteCurrentResume(){
+  if(!confirm('Delete this resume? This cannot be undone.')) return;
+  resumes = resumes.filter(r=>r.id!==editingResumeId);
+  saveResumes();
+  closeResumeModal();
+  renderVault();
 }
 
 function downloadResume(i){
@@ -1542,6 +1596,101 @@ function exportCSV(){
   a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
   a.download = `hireflow-applications-${new Date().toISOString().split('T')[0]}.csv`;
   a.click();
+}
+
+function importCSV(input){
+  const file = input.files[0];
+  if(!file) return;
+
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const lines = ev.target.result.split('\n').map(l=>l.trim()).filter(Boolean);
+    if(lines.length < 2){ alert('CSV appears empty or invalid.'); return; }
+
+    // Parse header row to map column names to indexes (case-insensitive)
+    const headers = lines[0].split(',').map(h=>h.replace(/^"|"$/g,'').trim().toLowerCase());
+    const idx = name => headers.indexOf(name.toLowerCase());
+
+    const col = {
+      company:     idx('company'),
+      role:        idx('role'),
+      status:      idx('status'),
+      priority:    idx('priority'),
+      location:    idx('location'),
+      salary:      idx('salary'),
+      dateApplied: idx('date applied'),
+      lastContact: idx('last contact'),
+      nextStep:    idx('next step'),
+      resumeLabel: idx('resume used'),
+      url:         idx('url'),
+      notes:       idx('notes'),
+    };
+
+    // Parse each data row
+    const parseRow = line => {
+      // Handle quoted fields that may contain commas
+      const fields = [];
+      let cur = '', inQuotes = false;
+      for(let i=0; i<line.length; i++){
+        const ch = line[i];
+        if(ch==='"'){ inQuotes = !inQuotes; }
+        else if(ch===',' && !inQuotes){ fields.push(cur); cur=''; }
+        else { cur += ch; }
+      }
+      fields.push(cur);
+      return fields.map(f=>f.trim());
+    };
+
+    let imported = 0, skipped = 0;
+    const newJobs = [];
+
+    for(let i=1; i<lines.length; i++){
+      const f = parseRow(lines[i]);
+      const company = col.company >= 0 ? f[col.company] : '';
+      const role    = col.role    >= 0 ? f[col.role]    : '';
+      if(!company && !role){ skipped++; continue; }
+
+      const status = col.status >= 0 ? f[col.status] : 'Applied';
+      const validStatus = ['Saved','Applied','Interview','Offer','Rejected'].includes(status) ? status : 'Applied';
+      const priority = col.priority >= 0 ? f[col.priority] : 'Medium';
+      const validPriority = ['High','Medium','Low'].includes(priority) ? priority : 'Medium';
+
+      newJobs.push({
+        id: (Date.now() + i).toString(),
+        company,
+        role,
+        status:      validStatus,
+        priority:    validPriority,
+        location:    col.location    >= 0 ? f[col.location]    : '',
+        salary:      col.salary      >= 0 ? f[col.salary]      : '',
+        dateApplied: col.dateApplied >= 0 ? f[col.dateApplied] : '',
+        lastContact: col.lastContact >= 0 ? f[col.lastContact] : '',
+        nextStep:    col.nextStep    >= 0 ? f[col.nextStep]    : '',
+        resumeLabel: col.resumeLabel >= 0 ? f[col.resumeLabel] : '',
+        url:         col.url         >= 0 ? f[col.url]         : '',
+        notes:       col.notes       >= 0 ? f[col.notes]       : '',
+      });
+      imported++;
+    }
+
+    if(!imported){ alert('No valid rows found in the CSV.'); input.value=''; return; }
+
+    const merge = confirm(`Found ${imported} application${imported>1?'s':''} in the CSV.\n\nClick OK to merge with your existing data.\nClick Cancel to replace all existing data.`);
+    if(merge){
+      jobs = [...jobs, ...newJobs];
+    } else {
+      if(!confirm('This will delete all current applications and replace with the CSV data. Are you sure?')){ input.value=''; return; }
+      jobs = newJobs;
+    }
+
+    saveJobs();
+    updateBadges();
+    input.value = '';
+    alert(`Successfully imported ${imported} application${imported>1?'s':''}${skipped?' ('+skipped+' empty rows skipped)':''}.`);
+  };
+
+  reader.onerror = () => alert('Could not read the file. Please try again.');
+  reader.readAsText(file);
 }
 
 // ─────────────────────────────────────────
