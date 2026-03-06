@@ -1,0 +1,1595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Hireflow — Job Application Tracker</title>
+
+  <!-- Fonts: Geist for UI, Lora for brand mark -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Chart.js for analytics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Geist', 'system-ui', 'sans-serif'],
+            brand: ['Lora', 'serif'],
+          },
+          colors: {
+            indigo: {
+              50:  '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe',
+              300: '#a5b4fc', 400: '#818cf8', 500: '#6366f1',
+              600: '#4f46e5', 700: '#4338ca', 800: '#3730a3', 900: '#312e81',
+            }
+          },
+          boxShadow: {
+            'card': '0 1px 3px 0 rgba(0,0,0,0.05), 0 1px 2px -1px rgba(0,0,0,0.04)',
+            'card-hover': '0 4px 16px 0 rgba(0,0,0,0.08), 0 2px 4px -1px rgba(0,0,0,0.04)',
+            'modal': '0 24px 60px rgba(0,0,0,0.15), 0 8px 20px rgba(0,0,0,0.08)',
+          },
+          keyframes: {
+            'fade-up': {
+              '0%': { opacity: '0', transform: 'translateY(10px)' },
+              '100%': { opacity: '1', transform: 'translateY(0)' },
+            },
+            'slide-in': {
+              '0%': { opacity: '0', transform: 'translateX(-8px)' },
+              '100%': { opacity: '1', transform: 'translateX(0)' },
+            },
+            'scale-in': {
+              '0%': { opacity: '0', transform: 'scale(0.96)' },
+              '100%': { opacity: '1', transform: 'scale(1)' },
+            },
+          },
+          animation: {
+            'fade-up': 'fade-up 0.3s ease both',
+            'slide-in': 'slide-in 0.25s ease both',
+            'scale-in': 'scale-in 0.2s ease both',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* ── Global ── */
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body { font-family: 'Geist', system-ui, sans-serif; background: #f8f9fb; color: #111827; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 99px; }
+
+    /* ── Sidebar ── */
+    .sidebar { width: 232px; flex-shrink: 0; }
+
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 12px; border-radius: 8px; cursor: pointer;
+      font-size: 14px; font-weight: 500; color: #6b7280;
+      transition: background 0.15s, color 0.15s;
+      user-select: none;
+    }
+    .nav-item:hover { background: #f3f4f6; color: #111827; }
+    .nav-item.active { background: #eef2ff; color: #4f46e5; }
+    .nav-item .nav-icon { width: 18px; height: 18px; flex-shrink: 0; opacity: 0.7; }
+    .nav-item.active .nav-icon { opacity: 1; }
+    .nav-badge {
+      margin-left: auto; background: #e5e7eb; color: #6b7280;
+      font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 99px;
+    }
+    .nav-item.active .nav-badge { background: #c7d2fe; color: #4338ca; }
+
+    /* ── Stat Cards ── */
+    .stat-card {
+      background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+      padding: 20px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      transition: box-shadow 0.2s, transform 0.2s;
+    }
+    .stat-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); transform: translateY(-1px); }
+
+    /* ── Status Badges ── */
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 12px; font-weight: 600; padding: 3px 10px;
+      border-radius: 99px; white-space: nowrap;
+    }
+    .badge-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .badge-saved    { background: #f3f4f6; color: #6b7280; }
+    .badge-saved .badge-dot    { background: #9ca3af; }
+    .badge-applied  { background: #eff6ff; color: #2563eb; }
+    .badge-applied .badge-dot  { background: #3b82f6; }
+    .badge-interview{ background: #fefce8; color: #ca8a04; }
+    .badge-interview .badge-dot{ background: #eab308; }
+    .badge-offer    { background: #f0fdf4; color: #16a34a; }
+    .badge-offer .badge-dot    { background: #22c55e; }
+    .badge-rejected { background: #fef2f2; color: #dc2626; }
+    .badge-rejected .badge-dot { background: #ef4444; }
+
+    /* Priority badges */
+    .badge-high   { background: #fff7ed; color: #ea580c; }
+    .badge-medium { background: #fefce8; color: #ca8a04; }
+    .badge-low    { background: #f0fdf4; color: #16a34a; }
+
+    /* ── Table ── */
+    .data-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+    .data-table th {
+      font-size: 12px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; color: #9ca3af; padding: 0 16px 12px;
+      text-align: left; white-space: nowrap;
+    }
+    .data-table td {
+      padding: 14px 16px; font-size: 14px; color: #374151;
+      border-top: 1px solid #f3f4f6;
+      transition: background 0.12s;
+    }
+    .data-table tbody tr:hover td { background: #fafafa; cursor: pointer; }
+    .data-table tbody tr:first-child td { border-top: none; }
+
+    /* ── Job Card (grid view) ── */
+    .job-card {
+      background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+      padding: 20px; cursor: pointer;
+      transition: box-shadow 0.18s, transform 0.18s, border-color 0.18s;
+    }
+    .job-card:hover {
+      box-shadow: 0 8px 24px rgba(0,0,0,0.09);
+      border-color: #c7d2fe;
+      transform: translateY(-2px);
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-family: 'Geist', sans-serif; font-size: 14px; font-weight: 500;
+      padding: 8px 16px; border-radius: 8px; border: none;
+      cursor: pointer; transition: all 0.15s; white-space: nowrap;
+    }
+    .btn-primary { background: #4f46e5; color: #fff; }
+    .btn-primary:hover { background: #4338ca; box-shadow: 0 4px 12px rgba(79,70,229,0.3); }
+    .btn-secondary { background: #fff; color: #374151; border: 1px solid #d1d5db; }
+    .btn-secondary:hover { background: #f9fafb; border-color: #9ca3af; }
+    .btn-ghost { background: none; color: #6b7280; border: none; padding: 6px 10px; }
+    .btn-ghost:hover { background: #f3f4f6; color: #111827; }
+    .btn-danger { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+    .btn-danger:hover { background: #fee2e2; }
+    .btn-sm { font-size: 13px; padding: 6px 12px; border-radius: 7px; }
+
+    /* ── Inputs ── */
+    .form-input, .form-select, .form-textarea {
+      width: 100%; font-family: 'Geist', sans-serif; font-size: 14px;
+      color: #111827; background: #fff; border: 1px solid #d1d5db;
+      border-radius: 8px; padding: 9px 12px;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      outline: none;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+    }
+    .form-input::placeholder, .form-textarea::placeholder { color: #9ca3af; }
+    .form-textarea { resize: vertical; min-height: 80px; }
+    .form-label {
+      display: block; font-size: 13px; font-weight: 500;
+      color: #374151; margin-bottom: 5px;
+    }
+    .form-group { margin-bottom: 16px; }
+
+    /* ── Modal ── */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.3);
+      backdrop-filter: blur(4px); z-index: 1000;
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px; opacity: 0; transition: opacity 0.2s;
+    }
+    .modal-backdrop.open { opacity: 1; }
+    .modal-box {
+      background: #fff; border-radius: 16px; width: 100%; max-width: 580px;
+      max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.15);
+      transform: scale(0.96); transition: transform 0.2s;
+    }
+    .modal-backdrop.open .modal-box { transform: scale(1); }
+
+    /* ── Search bar ── */
+    .search-wrap { position: relative; }
+    .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #9ca3af; }
+    .search-input {
+      font-family: 'Geist', sans-serif; font-size: 14px;
+      padding: 8px 12px 8px 34px; border: 1px solid #e5e7eb;
+      border-radius: 8px; background: #fff; outline: none; width: 240px;
+      color: #111827; transition: border-color 0.15s, box-shadow 0.15s, width 0.2s;
+    }
+    .search-input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); width: 300px; }
+    .search-input::placeholder { color: #9ca3af; }
+
+    /* ── Filter Dropdown ── */
+    .filter-select {
+      font-family: 'Geist', sans-serif; font-size: 14px; font-weight: 500;
+      color: #374151; background: #fff; border: 1px solid #e5e7eb;
+      border-radius: 8px; padding: 8px 12px; cursor: pointer; outline: none;
+      transition: border-color 0.15s;
+    }
+    .filter-select:focus { border-color: #6366f1; }
+
+    /* ── View Toggle ── */
+    .view-toggle { display: flex; gap: 2px; background: #f3f4f6; border-radius: 8px; padding: 3px; }
+    .view-btn {
+      padding: 5px 10px; border-radius: 6px; border: none; background: none;
+      cursor: pointer; color: #6b7280; transition: all 0.15s;
+      display: flex; align-items: center; gap: 4px; font-size: 13px;
+    }
+    .view-btn.active { background: #fff; color: #111827; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+    /* ── Empty state ── */
+    .empty-state { text-align: center; padding: 64px 24px; }
+    .empty-state-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.6; }
+    .empty-state-title { font-size: 16px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+    .empty-state-desc { font-size: 14px; color: #9ca3af; }
+
+    /* ── Page sections ── */
+    .page-section { display: none; }
+    .page-section.active { display: block; animation: fade-up 0.25s ease both; }
+
+    /* ── Progress bar ── */
+    .progress-track { background: #e5e7eb; border-radius: 99px; height: 6px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 99px; transition: width 0.6s ease; }
+
+    /* ── Tooltip ── */
+    [title] { cursor: help; }
+
+    /* ── Divider ── */
+    .divider { height: 1px; background: #f3f4f6; margin: 8px 0; }
+
+    /* ── Analytics Chart container ── */
+    .chart-wrap { position: relative; height: 200px; }
+
+    /* ── Mobile sidebar overlay ── */
+    .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 40; }
+    @media (max-width: 768px) {
+      .sidebar { position: fixed; left: -232px; top: 0; height: 100%; z-index: 50; transition: left 0.25s ease; background: #fff; border-right: 1px solid #e5e7eb; }
+      .sidebar.open { left: 0; }
+      .sidebar-overlay.open { display: block; }
+      .main-content { margin-left: 0 !important; }
+    }
+
+    /* ── Stale indicator pulse ── */
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .stale-pulse { animation: pulse 2s ease infinite; }
+
+    /* ── Fade-in for table rows ── */
+    .table-row-anim { animation: fade-up 0.2s ease both; }
+
+    /* ── Platform Quick Launch (carried over) ── */
+    .platform-pill {
+      display: flex; align-items: center; gap: 8px; padding: 8px 14px;
+      background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+      cursor: pointer; font-size: 13px; font-weight: 500; color: #374151;
+      text-decoration: none; transition: all 0.15s;
+    }
+    .platform-pill:hover { border-color: #a5b4fc; box-shadow: 0 4px 12px rgba(0,0,0,0.07); transform: translateY(-1px); }
+
+    /* ── Saved search chip ── */
+    .search-chip {
+      display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+      background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+      transition: all 0.15s;
+    }
+    .search-chip:hover { border-color: #c7d2fe; }
+
+    /* ── Resume card ── */
+    .resume-card {
+      background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+      padding: 20px; transition: all 0.18s;
+    }
+    .resume-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.08); border-color: #c7d2fe; transform: translateY(-1px); }
+
+    /* ── Notification dot ── */
+    .notif-dot { width: 8px; height: 8px; background: #ef4444; border-radius: 50%; }
+
+    /* ── Sidebar section label ── */
+    .sidebar-section-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #9ca3af; padding: 0 12px; margin-bottom: 4px; margin-top: 16px; }
+  </style>
+</head>
+
+<body class="h-full">
+<div class="flex h-full">
+
+  <!-- ══════════════════════════════════════
+       SIDEBAR
+  ══════════════════════════════════════ -->
+  <aside class="sidebar h-full bg-white border-r border-gray-100 flex flex-col py-5 px-3 overflow-y-auto" id="sidebar">
+
+    <!-- Brand -->
+    <div class="flex items-center gap-2.5 px-3 mb-6">
+      <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center flex-shrink-0">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <rect x="2" y="2" width="5" height="5" rx="1.2" fill="white" opacity=".9"/>
+          <rect x="9" y="2" width="5" height="5" rx="1.2" fill="white" opacity=".6"/>
+          <rect x="2" y="9" width="5" height="5" rx="1.2" fill="white" opacity=".6"/>
+          <rect x="9" y="9" width="5" height="5" rx="1.2" fill="white" opacity=".9"/>
+        </svg>
+      </div>
+      <span class="font-brand text-[17px] font-bold text-gray-900 tracking-tight">Hireflow</span>
+    </div>
+
+    <!-- Main Nav -->
+    <div class="sidebar-section-label">Workspace</div>
+    <nav class="flex flex-col gap-0.5">
+      <div class="nav-item active" onclick="navigate('dashboard', this)">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        Dashboard
+      </div>
+      <div class="nav-item" onclick="navigate('applications', this)">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
+        Applications
+        <span class="nav-badge" id="nav-badge-all">0</span>
+      </div>
+      <div class="nav-item" onclick="navigate('interviews', this)">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 0 0-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 0 1 5.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 0 1 9.288 0M15 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+        Interviews
+        <span class="nav-badge" id="nav-badge-interview">0</span>
+      </div>
+      <div class="nav-item" onclick="navigate('offers', this)">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+        Offers
+        <span class="nav-badge" id="nav-badge-offer">0</span>
+      </div>
+      <div class="nav-item" onclick="navigate('rejected', this)">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/></svg>
+        Rejected
+        <span class="nav-badge" id="nav-badge-rejected">0</span>
+      </div>
+    </nav>
+
+    <div class="sidebar-section-label">Tools</div>
+    <nav class="flex flex-col gap-0.5">
+      <div class="nav-item" onclick="navigate('job-feed', this)">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z"/></svg>
+        Job Feed
+      </div>
+      <div class="nav-item" onclick="navigate('resume-vault', this)">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Resume Vault
+      </div>
+      <div class="nav-item" onclick="navigate('analytics', this)">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+        Analytics
+      </div>
+    </nav>
+
+    <!-- Bottom: Settings & profile -->
+    <div class="mt-auto pt-4 border-t border-gray-100">
+      <div class="nav-item" onclick="navigate('settings', this)">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></svg>
+        Settings
+      </div>
+      <!-- User avatar pill -->
+      <div class="flex items-center gap-2.5 px-3 mt-3 py-2">
+        <div class="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-xs font-bold flex-shrink-0">Y</div>
+        <div class="min-w-0">
+          <div class="text-[13px] font-medium text-gray-800 truncate">Your Dashboard</div>
+          <div class="text-[11px] text-gray-400">Personal workspace</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Sidebar overlay (mobile) -->
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+  <!-- ══════════════════════════════════════
+       MAIN CONTENT
+  ══════════════════════════════════════ -->
+  <div class="flex-1 flex flex-col min-w-0 overflow-hidden" id="main-area">
+
+    <!-- ── TOP HEADER ── -->
+    <header class="bg-white border-b border-gray-100 flex items-center gap-3 px-6 h-14 flex-shrink-0 sticky top-0 z-30">
+      <!-- Mobile menu button -->
+      <button class="btn btn-ghost md:hidden p-1.5" onclick="openSidebar()">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+
+      <!-- Page title -->
+      <h1 class="text-[15px] font-semibold text-gray-900 flex-shrink-0" id="header-title">Dashboard</h1>
+
+      <div class="flex items-center gap-2 ml-auto">
+        <!-- Search -->
+        <div class="search-wrap hidden sm:block">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input class="search-input" id="global-search" placeholder="Search applications…" oninput="handleSearch(this.value)" />
+        </div>
+
+        <!-- Status filter -->
+        <select class="filter-select hidden sm:block" id="status-filter" onchange="handleFilter()">
+          <option value="">All Status</option>
+          <option value="Saved">Saved</option>
+          <option value="Applied">Applied</option>
+          <option value="Interview">Interview</option>
+          <option value="Offer">Offer</option>
+          <option value="Rejected">Rejected</option>
+        </select>
+
+        <!-- Priority filter -->
+        <select class="filter-select hidden md:block" id="priority-filter" onchange="handleFilter()">
+          <option value="">All Priority</option>
+          <option value="High">High</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+        </select>
+
+        <!-- View toggle (table/grid) -->
+        <div class="view-toggle hidden sm:flex" id="view-toggle">
+          <button class="view-btn active" id="view-table-btn" onclick="setView('table')" title="Table view">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
+            Table
+          </button>
+          <button class="view-btn" id="view-grid-btn" onclick="setView('grid')" title="Grid view">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            Grid
+          </button>
+        </div>
+
+        <!-- Add Job -->
+        <button class="btn btn-primary" onclick="openJobModal()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          Add Job
+        </button>
+      </div>
+    </header>
+
+    <!-- ── SCROLLABLE BODY ── -->
+    <main class="flex-1 overflow-y-auto p-6" id="main-body">
+
+      <!-- ════════ DASHBOARD PAGE ════════ -->
+      <section class="page-section active" id="page-dashboard">
+
+        <!-- Stats row -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6" id="stat-cards"></div>
+
+        <!-- Two-col layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+          <!-- Recent applications -->
+          <div class="lg:col-span-2 bg-white border border-gray-100 rounded-xl overflow-hidden shadow-card">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-gray-50">
+              <span class="text-[13px] font-semibold text-gray-700">Recent Applications</span>
+              <button class="text-[12px] text-indigo-600 hover:text-indigo-700 font-medium" onclick="navigate('applications', document.querySelector('[onclick*=\"applications\"]'))">View all →</button>
+            </div>
+            <div id="recent-table-body"></div>
+          </div>
+
+          <!-- Right col -->
+          <div class="flex flex-col gap-4">
+            <!-- Follow-up needed -->
+            <div class="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-card">
+              <div class="flex items-center gap-2 px-5 py-4 border-b border-gray-50">
+                <span class="stale-pulse w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
+                <span class="text-[13px] font-semibold text-gray-700">Follow-up Needed</span>
+              </div>
+              <div id="followup-list" class="divide-y divide-gray-50 max-h-48 overflow-y-auto"></div>
+            </div>
+
+            <!-- Activity feed -->
+            <div class="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-card flex-1">
+              <div class="px-5 py-4 border-b border-gray-50">
+                <span class="text-[13px] font-semibold text-gray-700">Pipeline Summary</span>
+              </div>
+              <div class="p-5 space-y-3" id="pipeline-summary"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ════════ APPLICATIONS PAGE ════════ -->
+      <section class="page-section" id="page-applications">
+        <div id="jobs-table-wrap"></div>
+      </section>
+
+      <!-- ════════ FILTERED PAGES ════════ -->
+      <section class="page-section" id="page-interviews">
+        <div id="interviews-wrap"></div>
+      </section>
+      <section class="page-section" id="page-offers">
+        <div id="offers-wrap"></div>
+      </section>
+      <section class="page-section" id="page-rejected">
+        <div id="rejected-wrap"></div>
+      </section>
+
+      <!-- ════════ JOB FEED PAGE ════════ -->
+      <section class="page-section" id="page-job-feed">
+        <!-- Quick Launch -->
+        <div class="bg-white border border-gray-100 rounded-xl p-5 mb-4 shadow-card">
+          <div class="text-[13px] font-semibold text-gray-700 mb-3">Quick Launch Platforms</div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2" id="platform-grid-new"></div>
+        </div>
+
+        <!-- Saved searches -->
+        <div class="bg-white border border-gray-100 rounded-xl p-5 shadow-card">
+          <div class="flex items-center justify-between mb-4">
+            <div class="text-[13px] font-semibold text-gray-700">Saved Searches</div>
+            <button class="btn btn-primary btn-sm" onclick="openSearchModal()">+ New Search</button>
+          </div>
+          <div id="saved-searches-list"></div>
+        </div>
+      </section>
+
+      <!-- ════════ RESUME VAULT PAGE ════════ -->
+      <section class="page-section" id="page-resume-vault">
+        <!-- Match tool -->
+        <div class="bg-white border border-gray-100 rounded-xl p-5 mb-4 shadow-card">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
+            <div>
+              <div class="text-[13px] font-semibold text-gray-800">Resume Match Assistant</div>
+              <div class="text-[12px] text-gray-400">Paste a job description to find your best-fit resume</div>
+            </div>
+          </div>
+          <textarea class="form-textarea" id="jd-input" placeholder="Paste the job description here…" style="min-height:90px;"></textarea>
+          <div class="flex items-center gap-3 mt-2">
+            <button class="btn btn-primary btn-sm" onclick="matchResume()">Find Best Match</button>
+            <span class="text-[13px] text-gray-400" id="match-status"></span>
+          </div>
+          <div id="match-result" class="hidden mt-3 p-4 bg-gray-50 border border-gray-100 rounded-lg">
+            <div class="text-[13px] font-semibold text-indigo-600 mb-3">Resume Match Scores</div>
+            <div id="match-bars" class="space-y-2.5"></div>
+            <div id="match-rec" class="mt-3 pt-3 border-t border-gray-100 text-[13px] text-gray-500"></div>
+          </div>
+        </div>
+
+        <!-- Resume grid -->
+        <div class="flex items-center justify-between mb-3">
+          <div class="text-[13px] font-semibold text-gray-700">Your Resumes</div>
+          <button class="btn btn-primary btn-sm" onclick="openResumeModal()">+ Add Resume</button>
+        </div>
+        <div id="vault-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+      </section>
+
+      <!-- ════════ ANALYTICS PAGE ════════ -->
+      <section class="page-section" id="page-analytics">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4" id="analytics-stats"></div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <!-- Application timeline -->
+          <div class="bg-white border border-gray-100 rounded-xl p-5 shadow-card">
+            <div class="text-[13px] font-semibold text-gray-700 mb-4">Applications Over Time</div>
+            <div class="chart-wrap"><canvas id="timeline-chart"></canvas></div>
+          </div>
+          <!-- Status breakdown -->
+          <div class="bg-white border border-gray-100 rounded-xl p-5 shadow-card">
+            <div class="text-[13px] font-semibold text-gray-700 mb-4">Status Breakdown</div>
+            <div class="chart-wrap"><canvas id="status-chart"></canvas></div>
+          </div>
+          <!-- Platform / source -->
+          <div class="bg-white border border-gray-100 rounded-xl p-5 shadow-card lg:col-span-2">
+            <div class="text-[13px] font-semibold text-gray-700 mb-4">Interview & Offer Funnel</div>
+            <div id="funnel-bars" class="space-y-3"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ════════ SETTINGS PAGE ════════ -->
+      <section class="page-section" id="page-settings">
+        <div class="max-w-lg">
+          <div class="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-card mb-4">
+            <div class="px-5 py-4 border-b border-gray-50 text-[13px] font-semibold text-gray-700">Data Management</div>
+            <div class="p-5 space-y-3">
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="text-[14px] font-medium text-gray-800">Export All Data</div>
+                  <div class="text-[12px] text-gray-400 mt-0.5">Download your applications as a CSV file</div>
+                </div>
+                <button class="btn btn-secondary btn-sm" onclick="exportCSV()">↓ Export CSV</button>
+              </div>
+              <div class="divider"></div>
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="text-[14px] font-medium text-gray-800">Clear All Applications</div>
+                  <div class="text-[12px] text-red-400 mt-0.5">This cannot be undone</div>
+                </div>
+                <button class="btn btn-danger btn-sm" onclick="clearAllJobs()">Clear All</button>
+              </div>
+            </div>
+          </div>
+          <div class="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-card">
+            <div class="px-5 py-4 border-b border-gray-50 text-[13px] font-semibold text-gray-700">Follow-up Settings</div>
+            <div class="p-5">
+              <label class="form-label">Mark as stale after (days)</label>
+              <input type="number" class="form-input w-28" id="stale-days-input" value="14" min="1" max="90" onchange="saveSettings()" />
+              <p class="text-[12px] text-gray-400 mt-1.5">Applied/Interview cards with no contact update after this many days will show a follow-up badge.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main><!-- /main-body -->
+  </div><!-- /main-area -->
+</div><!-- /flex -->
+
+<!-- ══════════════════════════════════════
+     ADD / EDIT JOB MODAL
+══════════════════════════════════════ -->
+<div class="modal-backdrop" id="job-modal" onclick="closeOnBackdrop(event,'job-modal')">
+  <div class="modal-box">
+    <div class="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+      <h2 class="text-[16px] font-semibold text-gray-900" id="job-modal-title">Add Application</h2>
+      <button class="btn btn-ghost p-1.5" onclick="closeJobModal()">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="p-6">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="form-group">
+          <label class="form-label">Company <span class="text-red-400">*</span></label>
+          <input class="form-input" id="j-company" placeholder="e.g. Deloitte" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Role / Title <span class="text-red-400">*</span></label>
+          <input class="form-input" id="j-role" placeholder="e.g. Health Analyst" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Location</label>
+          <input class="form-input" id="j-location" placeholder="e.g. New York, NY or Remote" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Salary Range</label>
+          <input class="form-input" id="j-salary" placeholder="e.g. $60k – $80k" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Date Applied</label>
+          <input class="form-input" id="j-date" type="date" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Last Contact</label>
+          <input class="form-input" id="j-contact" type="date" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select class="form-select" id="j-status">
+            <option value="Saved">Saved</option>
+            <option value="Applied">Applied</option>
+            <option value="Interview">Interview</option>
+            <option value="Offer">Offer</option>
+            <option value="Rejected">Rejected</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Priority</label>
+          <select class="form-select" id="j-priority">
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
+            <option value="Low">Low</option>
+          </select>
+        </div>
+        <div class="form-group col-span-2">
+          <label class="form-label">Job Posting URL</label>
+          <input class="form-input" id="j-url" placeholder="https://…" />
+        </div>
+        <div class="form-group col-span-2">
+          <label class="form-label">Resume Used</label>
+          <select class="form-select" id="j-resume"></select>
+        </div>
+        <div class="form-group col-span-2">
+          <label class="form-label">Next Step</label>
+          <input class="form-input" id="j-nextstep" placeholder="e.g. Send thank-you email, prepare case study…" />
+        </div>
+        <div class="form-group col-span-2">
+          <label class="form-label">Notes</label>
+          <textarea class="form-textarea" id="j-notes" placeholder="Recruiter name, salary details, interview prep…"></textarea>
+        </div>
+      </div>
+      <!-- Validation message -->
+      <div id="j-error" class="hidden text-[13px] text-red-500 mb-3 bg-red-50 px-3 py-2 rounded-lg">Please fill in Company and Role fields.</div>
+      <!-- Actions -->
+      <div class="flex items-center gap-2 pt-2">
+        <button class="btn btn-danger btn-sm hidden" id="j-delete-btn" onclick="deleteCurrentJob()">Delete</button>
+        <div class="ml-auto flex gap-2">
+          <button class="btn btn-secondary" onclick="closeJobModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveJob()">Save Application</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SAVED SEARCH MODAL
+══════════════════════════════════════ -->
+<div class="modal-backdrop" id="search-modal" onclick="closeOnBackdrop(event,'search-modal')">
+  <div class="modal-box" style="max-width:480px;">
+    <div class="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+      <h2 class="text-[16px] font-semibold text-gray-900">Create Saved Search</h2>
+      <button class="btn btn-ghost p-1.5" onclick="closeSearchModal()">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="p-6">
+      <div class="form-group">
+        <label class="form-label">Search Name <span class="text-red-400">*</span></label>
+        <input class="form-input" id="s-name" placeholder="e.g. NYC Public Health Entry Level" />
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="form-group">
+          <label class="form-label">Keywords</label>
+          <input class="form-input" id="s-keywords" placeholder="e.g. public health analyst" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Location</label>
+          <input class="form-input" id="s-location" placeholder="e.g. New York, NY" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label mb-2">Platforms</label>
+        <div class="grid grid-cols-2 gap-1.5" id="search-platform-checks"></div>
+      </div>
+      <div class="flex justify-end gap-2 pt-1">
+        <button class="btn btn-secondary" onclick="closeSearchModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveSearch()">Save Search</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     ADD RESUME MODAL
+══════════════════════════════════════ -->
+<div class="modal-backdrop" id="resume-modal" onclick="closeOnBackdrop(event,'resume-modal')">
+  <div class="modal-box" style="max-width:480px;">
+    <div class="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+      <h2 class="text-[16px] font-semibold text-gray-900">Add Resume</h2>
+      <button class="btn btn-ghost p-1.5" onclick="closeResumeModal()">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="p-6">
+      <div class="form-group">
+        <label class="form-label">Label <span class="text-red-400">*</span></label>
+        <input class="form-input" id="r-label" placeholder="e.g. Public Health — Epi Focus" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <input class="form-input" id="r-desc" placeholder="Short note about this version" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Keywords / Tags <span class="text-gray-400 font-normal">(comma separated)</span></label>
+        <input class="form-input" id="r-tags" placeholder="e.g. epidemiology, data analysis, SPSS" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Target Role Types</label>
+        <input class="form-input" id="r-roles" placeholder="e.g. Research Analyst, Program Coordinator" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Upload PDF</label>
+        <div class="border-2 border-dashed border-gray-200 rounded-lg p-5 text-center cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/30 transition-all" onclick="document.getElementById('r-file').click()">
+          <div class="mb-1.5 text-gray-300"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></div>
+          <div class="text-[13px] text-gray-500 font-medium" id="r-file-label">Click to upload resume PDF</div>
+          <div class="text-[11px] text-gray-400 mt-0.5">PDF, DOC, DOCX</div>
+        </div>
+        <input type="file" id="r-file" accept=".pdf,.doc,.docx" onchange="handleFileSelect(this)" class="hidden" />
+      </div>
+      <div class="flex justify-end gap-2 pt-1">
+        <button class="btn btn-secondary" onclick="closeResumeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveResume()">Save Resume</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════ -->
+<script>
+// ─────────────────────────────────────────
+//  CONSTANTS & DATA
+// ─────────────────────────────────────────
+const PLATFORMS = [
+  { name:'LinkedIn',   emoji:'', color:'#0A66C2', url:(k,l)=>`https://www.linkedin.com/jobs/search/?keywords=${e(k)}&location=${e(l)}` },
+  { name:'Indeed',     emoji:'', color:'#003A9B', url:(k,l)=>`https://www.indeed.com/jobs?q=${e(k)}&l=${e(l)}` },
+  { name:'Handshake',  emoji:'', color:'#E8563D', url:(k,l)=>`https://app.joinhandshake.com/jobs?query=${e(k)}` },
+  { name:'Glassdoor',  emoji:'', color:'#0CAA41', url:(k,l)=>`https://www.glassdoor.com/Job/jobs.htm?sc.keyword=${e(k)}` },
+  { name:'USAJobs',    emoji:'', color:'#1A4480', url:(k,l)=>`https://www.usajobs.gov/Search/Results?k=${e(k)}&l=${e(l)}` },
+  { name:'Idealist',   emoji:'', color:'#2E7D32', url:(k,l)=>`https://www.idealist.org/en/jobs?q=${e(k)}&location=${e(l)}` },
+  { name:'Wellfound',  emoji:'', color:'#FF6154', url:(k,l)=>`https://wellfound.com/jobs?role=${e(k)}` },
+  { name:'ZipRecruiter',emoji:'', color:'#3D5A80', url:(k,l)=>`https://www.ziprecruiter.com/jobs-search?search=${e(k)}&location=${e(l)}` },
+];
+const STATUSES = ['Saved','Applied','Interview','Offer','Rejected'];
+const PRIORITIES = ['High','Medium','Low'];
+function e(s){ return encodeURIComponent(s||''); }
+
+// ─────────────────────────────────────────
+//  STORAGE HELPERS
+// ─────────────────────────────────────────
+const DB = {
+  get(k){ try{ return JSON.parse(localStorage.getItem(k))||[]; }catch{ return []; } },
+  getObj(k,d={}){ try{ return JSON.parse(localStorage.getItem(k))||d; }catch{ return d; } },
+  set(k,v){ localStorage.setItem(k,JSON.stringify(v)); }
+};
+
+let jobs     = DB.get('hf_jobs');
+let searches = DB.get('hf_searches');
+let resumes  = DB.get('hf_resumes');
+let settings = DB.getObj('hf_settings', { staleDays: 14 });
+
+function saveJobs()    { DB.set('hf_jobs', jobs); }
+function saveSearches(){ DB.set('hf_searches', searches); }
+function saveResumes() { DB.set('hf_resumes', resumes); }
+function saveSettings(){ settings.staleDays = parseInt(document.getElementById('stale-days-input').value)||14; DB.set('hf_settings', settings); }
+
+// ─────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────
+let currentPage = 'dashboard';
+let currentView = 'table';   // 'table' | 'grid'
+let editingJobId = null;
+let filterStatus = '';
+let filterPriority = '';
+let searchQuery = '';
+let selectedFile = null;
+let chartTimeline = null;
+let chartStatus = null;
+
+// ─────────────────────────────────────────
+//  NAVIGATION
+// ─────────────────────────────────────────
+function navigate(page, el) {
+  // Update sidebar active state
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if(el) el.classList.add('active');
+
+  // Hide all pages
+  document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
+
+  currentPage = page;
+
+  // Map page key to DOM id
+  const pageId = 'page-' + page;
+  const section = document.getElementById(pageId);
+  if(section) section.classList.add('active');
+
+  // Update header title
+  const titles = {
+    dashboard: 'Dashboard', applications: 'Applications',
+    interviews: 'Interviews', offers: 'Offers', rejected: 'Rejected',
+    'job-feed': 'Job Feed', 'resume-vault': 'Resume Vault',
+    analytics: 'Analytics', settings: 'Settings'
+  };
+  document.getElementById('header-title').textContent = titles[page] || page;
+
+  // Show/hide filters based on page
+  const showFilters = ['applications','interviews','offers','rejected','dashboard'].includes(page);
+  document.getElementById('status-filter').closest('.filter-select') && null;
+  document.getElementById('view-toggle').style.display = ['applications','interviews','offers','rejected'].includes(page) ? '' : 'none';
+
+  // Render page content
+  if(page==='dashboard')      renderDashboard();
+  if(page==='applications')   renderJobsPage(jobs, 'jobs-table-wrap');
+  if(page==='interviews')     renderJobsPage(jobs.filter(j=>j.status==='Interview'), 'interviews-wrap');
+  if(page==='offers')         renderJobsPage(jobs.filter(j=>j.status==='Offer'), 'offers-wrap');
+  if(page==='rejected')       renderJobsPage(jobs.filter(j=>j.status==='Rejected'), 'rejected-wrap');
+  if(page==='job-feed')       renderJobFeed();
+  if(page==='resume-vault')   renderVault();
+  if(page==='analytics')      renderAnalytics();
+  if(page==='settings')       renderSettings();
+
+  // Mobile: close sidebar
+  closeSidebar();
+}
+
+// ─────────────────────────────────────────
+//  FILTER & SEARCH
+// ─────────────────────────────────────────
+function handleSearch(val){
+  searchQuery = val.toLowerCase();
+  refreshCurrentPage();
+}
+function handleFilter(){
+  filterStatus   = document.getElementById('status-filter').value;
+  filterPriority = document.getElementById('priority-filter').value;
+  refreshCurrentPage();
+}
+function getFilteredJobs(source){
+  return (source||jobs).filter(j => {
+    const matchSearch = !searchQuery ||
+      j.company.toLowerCase().includes(searchQuery) ||
+      j.role.toLowerCase().includes(searchQuery) ||
+      (j.location||'').toLowerCase().includes(searchQuery);
+    const matchStatus   = !filterStatus   || j.status   === filterStatus;
+    const matchPriority = !filterPriority || j.priority === filterPriority;
+    return matchSearch && matchStatus && matchPriority;
+  });
+}
+function refreshCurrentPage(){
+  if(currentPage==='dashboard')    renderDashboard();
+  if(currentPage==='applications') renderJobsPage(getFilteredJobs(), 'jobs-table-wrap');
+  if(currentPage==='interviews')   renderJobsPage(getFilteredJobs(jobs.filter(j=>j.status==='Interview')), 'interviews-wrap');
+  if(currentPage==='offers')       renderJobsPage(getFilteredJobs(jobs.filter(j=>j.status==='Offer')), 'offers-wrap');
+  if(currentPage==='rejected')     renderJobsPage(getFilteredJobs(jobs.filter(j=>j.status==='Rejected')), 'rejected-wrap');
+}
+
+// ─────────────────────────────────────────
+//  VIEW TOGGLE
+// ─────────────────────────────────────────
+function setView(v){
+  currentView = v;
+  document.getElementById('view-table-btn').classList.toggle('active', v==='table');
+  document.getElementById('view-grid-btn').classList.toggle('active', v==='grid');
+  refreshCurrentPage();
+}
+
+// ─────────────────────────────────────────
+//  SIDEBAR BADGES
+// ─────────────────────────────────────────
+function updateBadges(){
+  const counts = {};
+  STATUSES.forEach(s=>counts[s]=0);
+  jobs.forEach(j=>counts[j.status]=(counts[j.status]||0)+1);
+  document.getElementById('nav-badge-all').textContent      = jobs.length;
+  document.getElementById('nav-badge-interview').textContent = counts['Interview'];
+  document.getElementById('nav-badge-offer').textContent    = counts['Offer'];
+  document.getElementById('nav-badge-rejected').textContent = counts['Rejected'];
+}
+
+// ─────────────────────────────────────────
+//  STAT CARDS
+// ─────────────────────────────────────────
+function renderStatCards(){
+  const c = {};
+  STATUSES.forEach(s=>c[s]=0);
+  jobs.forEach(j=>c[j.status]=(c[j.status]||0)+1);
+  const stale = jobs.filter(j=>isStale(j)).length;
+
+  const cards = [
+    { label:'Total Applications', value: jobs.length,    icon:`<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>`, color:'indigo', sub: `${c['Saved']} saved` },
+    { label:'Interviews',         value: c['Interview'],  icon:`<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 0 0-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 0 1 5.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 0 1 9.288 0M15 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>`, color:'amber',  sub: `${pct(c['Interview'],jobs.length)}% interview rate` },
+    { label:'Offers',             value: c['Offer'],      icon:`<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>`, color:'green',  sub: `${pct(c['Offer'],jobs.length)}% offer rate` },
+    { label:'Follow-up Needed',   value: stale,           icon:`<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/></svg>`, color:'orange', sub: `${c['Rejected']} rejected` },
+  ];
+
+  const colorMap = {
+    indigo: 'text-indigo-600 bg-indigo-50',
+    amber:  'text-yellow-600 bg-yellow-50',
+    green:  'text-green-600 bg-green-50',
+    orange: 'text-orange-500 bg-orange-50',
+  };
+
+  document.getElementById('stat-cards').innerHTML = cards.map((card,i)=>`
+    <div class="stat-card" style="animation-delay:${i*60}ms" class="animate-fade-up">
+      <div class="flex items-start justify-between mb-3">
+        <div class="text-[12px] font-semibold uppercase tracking-wide text-gray-400">${card.label}</div>
+        <div class="w-8 h-8 rounded-lg ${colorMap[card.color]} flex items-center justify-center text-base">${card.icon}</div>
+      </div>
+      <div class="text-[32px] font-bold text-gray-900 leading-none mb-1">${card.value}</div>
+      <div class="text-[12px] text-gray-400">${card.sub}</div>
+    </div>
+  `).join('');
+}
+
+function pct(a,b){ return b?Math.round((a/b)*100):0; }
+
+// ─────────────────────────────────────────
+//  STALE CHECK
+// ─────────────────────────────────────────
+function isStale(j){
+  if(!['Applied','Interview'].includes(j.status)) return false;
+  const ref = j.lastContact || j.dateApplied;
+  if(!ref) return false;
+  return (Date.now()-new Date(ref)) / 86400000 > (settings.staleDays||14);
+}
+
+// ─────────────────────────────────────────
+//  STATUS BADGE HTML
+// ─────────────────────────────────────────
+function badgeHTML(status){
+  const cls = { Saved:'badge-saved', Applied:'badge-applied', Interview:'badge-interview', Offer:'badge-offer', Rejected:'badge-rejected' };
+  return `<span class="badge ${cls[status]||'badge-saved'}"><span class="badge-dot"></span>${status}</span>`;
+}
+function priorityBadge(p){
+  const cls = { High:'badge-high', Medium:'badge-medium', Low:'badge-low' };
+  return `<span class="badge ${cls[p]||'badge-medium'}" style="font-size:11px;padding:2px 8px;">${p||'Medium'}</span>`;
+}
+
+// ─────────────────────────────────────────
+//  FORMAT DATE
+// ─────────────────────────────────────────
+function fmtDate(d){
+  if(!d) return '—';
+  return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+}
+
+// ─────────────────────────────────────────
+//  DASHBOARD
+// ─────────────────────────────────────────
+function renderDashboard(){
+  renderStatCards();
+  updateBadges();
+
+  // Recent applications table (last 8)
+  const recent = [...jobs].sort((a,b)=>new Date(b.dateApplied||0)-new Date(a.dateApplied||0)).slice(0,8);
+  const tbody = document.getElementById('recent-table-body');
+  if(!recent.length){
+    tbody.innerHTML = `<div class="empty-state"><div class="empty-state-icon" style="font-size:0;margin-bottom:12px;"><svg width="40" height="40" fill="none" stroke="#d1d5db" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg></div><div class="empty-state-title">No applications yet</div><div class="empty-state-desc">Click "Add Job" to log your first application</div></div>`;
+  } else {
+    tbody.innerHTML = `
+      <table class="data-table">
+        <thead><tr>
+          <th>Company</th><th>Role</th><th>Status</th><th>Date</th><th>Priority</th>
+        </tr></thead>
+        <tbody>
+          ${recent.map(j=>`
+            <tr onclick="openJobModal('${j.id}')" class="table-row-anim">
+              <td class="font-medium text-gray-900">${j.company}</td>
+              <td class="text-gray-500">${j.role}</td>
+              <td>${badgeHTML(j.status)}</td>
+              <td class="text-gray-400 text-[13px]">${fmtDate(j.dateApplied)}</td>
+              <td>${priorityBadge(j.priority)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  // Follow-up list
+  const stale = jobs.filter(j=>isStale(j));
+  const fl = document.getElementById('followup-list');
+  if(!stale.length){
+    fl.innerHTML = `<div class="px-5 py-4 text-[13px] text-gray-400">No follow-ups needed right now</div>`;
+  } else {
+    fl.innerHTML = stale.map(j=>`
+      <div class="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 cursor-pointer" onclick="openJobModal('${j.id}')">
+        <div class="flex-1 min-w-0">
+          <div class="text-[13px] font-medium text-gray-800 truncate">${j.company}</div>
+          <div class="text-[12px] text-gray-400 truncate">${j.role}</div>
+        </div>
+        ${badgeHTML(j.status)}
+      </div>
+    `).join('');
+  }
+
+  // Pipeline summary
+  const ps = document.getElementById('pipeline-summary');
+  const counts = {};
+  STATUSES.forEach(s=>counts[s]=0);
+  jobs.forEach(j=>counts[j.status]=(counts[j.status]||0)+1);
+  const total = jobs.length || 1;
+  const pipelineItems = [
+    { label:'Applied',   count:counts['Applied'],   color:'bg-blue-500' },
+    { label:'Interview', count:counts['Interview'], color:'bg-yellow-500' },
+    { label:'Offer',     count:counts['Offer'],     color:'bg-green-500' },
+    { label:'Rejected',  count:counts['Rejected'],  color:'bg-red-400' },
+  ];
+  ps.innerHTML = pipelineItems.map(p=>`
+    <div>
+      <div class="flex justify-between text-[12px] mb-1.5">
+        <span class="text-gray-600 font-medium">${p.label}</span>
+        <span class="text-gray-400">${p.count} <span class="text-gray-300">/ ${jobs.length}</span></span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill ${p.color}" style="width:${(p.count/total)*100}%"></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ─────────────────────────────────────────
+//  JOBS TABLE / GRID
+// ─────────────────────────────────────────
+function renderJobsPage(data, containerId){
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  if(!data.length){
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon" style="font-size:0;margin-bottom:12px;"><svg width="40" height="40" fill="none" stroke="#d1d5db" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg></div><div class="empty-state-title">No applications found</div><div class="empty-state-desc">Try adjusting your search or filters, or add a new application.</div></div>`;
+    return;
+  }
+
+  if(currentView==='grid'){
+    el.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      ${data.map((j,i)=>jobCardHTML(j,i)).join('')}
+    </div>`;
+  } else {
+    el.innerHTML = `
+      <div class="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-card">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Company</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Priority</th>
+              <th>Location</th>
+              <th>Date Applied</th>
+              <th>Next Step</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.map((j,i)=>tableRowHTML(j,i)).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+}
+
+function tableRowHTML(j,i){
+  const staleIcon = isStale(j) ? ' <span class="inline-block w-2 h-2 rounded-full bg-amber-400 stale-pulse" title="Follow-up needed"></span>' : '';
+  return `
+    <tr onclick="openJobModal('${j.id}')" class="table-row-anim" style="animation-delay:${i*30}ms">
+      <td>
+        <div class="font-semibold text-gray-900 text-[14px]">${j.company}${staleIcon}</div>
+        ${j.salary ? `<div class="text-[12px] text-gray-400 mt-0.5">${j.salary}</div>` : ''}
+      </td>
+      <td class="text-gray-600">${j.role}</td>
+      <td>${badgeHTML(j.status)}</td>
+      <td>${priorityBadge(j.priority)}</td>
+      <td class="text-gray-400 text-[13px]">${j.location||'—'}</td>
+      <td class="text-gray-400 text-[13px]">${fmtDate(j.dateApplied)}</td>
+      <td class="text-gray-400 text-[13px] max-w-[160px] truncate">${j.nextStep||'—'}</td>
+    </tr>`;
+}
+
+function jobCardHTML(j,i){
+  return `
+    <div class="job-card" onclick="openJobModal('${j.id}')" style="animation-delay:${i*40}ms">
+      <div class="flex items-start justify-between mb-2">
+        ${badgeHTML(j.status)}
+        ${priorityBadge(j.priority)}
+      </div>
+      <div class="text-[15px] font-semibold text-gray-900 mt-2">${j.company}</div>
+      <div class="text-[13px] text-gray-500 mt-0.5 mb-3">${j.role}</div>
+      <div class="flex flex-wrap gap-2 text-[12px] text-gray-400">
+        ${j.location ? `<span> ${j.location}</span>` : ''}
+        ${j.salary ? `<span>$${j.salary}</span>` : ''}
+        ${j.dateApplied ? `<span> ${fmtDate(j.dateApplied)}</span>` : ''}
+      </div>
+      ${j.nextStep ? `<div class="mt-3 pt-3 border-t border-gray-50 text-[12px] text-indigo-600 font-medium">→ ${j.nextStep}</div>` : ''}
+    </div>`;
+}
+
+// ─────────────────────────────────────────
+//  ADD / EDIT JOB MODAL
+// ─────────────────────────────────────────
+function openJobModal(id){
+  editingJobId = id || null;
+  const j = id ? jobs.find(x=>x.id===id) : null;
+
+  document.getElementById('job-modal-title').textContent = j ? 'Edit Application' : 'Add Application';
+  document.getElementById('j-company').value  = j?.company  || '';
+  document.getElementById('j-role').value     = j?.role     || '';
+  document.getElementById('j-location').value = j?.location || '';
+  document.getElementById('j-salary').value   = j?.salary   || '';
+  document.getElementById('j-date').value     = j?.dateApplied  || new Date().toISOString().split('T')[0];
+  document.getElementById('j-contact').value  = j?.lastContact  || '';
+  document.getElementById('j-url').value      = j?.url      || '';
+  document.getElementById('j-notes').value    = j?.notes    || '';
+  document.getElementById('j-nextstep').value = j?.nextStep || '';
+  document.getElementById('j-status').value   = j?.status   || 'Applied';
+  document.getElementById('j-priority').value = j?.priority || 'Medium';
+  document.getElementById('j-error').classList.add('hidden');
+
+  // Resume dropdown
+  const sel = document.getElementById('j-resume');
+  sel.innerHTML = '<option value="">— No resume selected —</option>' +
+    resumes.map(r=>`<option value="${r.id}" ${j?.resumeId===r.id?'selected':''}>${r.label}</option>`).join('');
+
+  document.getElementById('j-delete-btn').classList.toggle('hidden', !j);
+  openModal('job-modal');
+}
+
+function closeJobModal(){ closeModal('job-modal'); }
+
+function saveJob(){
+  const company = document.getElementById('j-company').value.trim();
+  const role    = document.getElementById('j-role').value.trim();
+  if(!company||!role){
+    document.getElementById('j-error').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('j-error').classList.add('hidden');
+
+  const resumeSel = document.getElementById('j-resume');
+  const resumeLabel = resumeSel.options[resumeSel.selectedIndex]?.text || '';
+  const resumeId  = resumeSel.value;
+
+  const data = {
+    company, role,
+    location:  document.getElementById('j-location').value.trim(),
+    salary:    document.getElementById('j-salary').value.trim(),
+    dateApplied: document.getElementById('j-date').value,
+    lastContact: document.getElementById('j-contact').value,
+    url:       document.getElementById('j-url').value.trim(),
+    notes:     document.getElementById('j-notes').value.trim(),
+    nextStep:  document.getElementById('j-nextstep').value.trim(),
+    status:    document.getElementById('j-status').value,
+    priority:  document.getElementById('j-priority').value,
+    resumeId, resumeLabel,
+  };
+
+  if(editingJobId){
+    const idx = jobs.findIndex(j=>j.id===editingJobId);
+    jobs[idx] = { ...jobs[idx], ...data };
+  } else {
+    jobs.push({ id: Date.now().toString(), ...data });
+  }
+
+  saveJobs();
+  closeJobModal();
+  updateBadges();
+  refreshCurrentPage();
+}
+
+function deleteCurrentJob(){
+  if(!confirm('Delete this application? This cannot be undone.')) return;
+  jobs = jobs.filter(j=>j.id!==editingJobId);
+  saveJobs();
+  closeJobModal();
+  updateBadges();
+  refreshCurrentPage();
+}
+
+// ─────────────────────────────────────────
+//  JOB FEED
+// ─────────────────────────────────────────
+function renderJobFeed(){
+  // Platform grid
+  const pg = document.getElementById('platform-grid-new');
+  pg.innerHTML = PLATFORMS.map(p=>`
+    <a class="platform-pill" href="${p.url('','')}" target="_blank" rel="noopener">
+      <span>${p.emoji}</span>
+      <span>${p.name}</span>
+    </a>
+  `).join('');
+
+  // Saved searches
+  renderSearchList();
+}
+
+function renderSearchList(){
+  const el = document.getElementById('saved-searches-list');
+  if(!searches.length){
+    el.innerHTML = `<div class="empty-state" style="padding:40px 24px;"><div class="empty-state-icon" style="font-size:0;margin-bottom:12px;"><svg width="40" height="40" fill="none" stroke="#d1d5db" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg></div><div class="empty-state-title">No saved searches yet</div><div class="empty-state-desc">Create a saved search to launch multiple platforms at once.</div></div>`;
+    return;
+  }
+  el.innerHTML = `<div class="space-y-2">
+    ${searches.map((s,i)=>`
+      <div class="search-chip">
+        <div class="flex-1 min-w-0">
+          <div class="text-[14px] font-semibold text-gray-800">${s.name}</div>
+          <div class="text-[12px] text-gray-400 truncate">${s.keywords}${s.location?' · '+s.location:''} · ${s.platforms.join(', ')}</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="launchSearch(${i})">▶ Launch</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteSearch(${i})" style="color:#ef4444;">×</button>
+      </div>
+    `).join('')}
+  </div>`;
+}
+
+function openSearchModal(){
+  document.getElementById('s-name').value = '';
+  document.getElementById('s-keywords').value = '';
+  document.getElementById('s-location').value = '';
+  document.getElementById('search-platform-checks').innerHTML = PLATFORMS.map(p=>`
+    <label class="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/30 transition-all text-[13px] font-medium text-gray-700">
+      <input type="checkbox" value="${p.name}" checked class="accent-indigo-600" />
+      ${p.emoji} ${p.name}
+    </label>
+  `).join('');
+  openModal('search-modal');
+}
+function closeSearchModal(){ closeModal('search-modal'); }
+
+function saveSearch(){
+  const name = document.getElementById('s-name').value.trim();
+  const keywords = document.getElementById('s-keywords').value.trim();
+  if(!name){ alert('Please add a name.'); return; }
+  const platforms = [...document.querySelectorAll('#search-platform-checks input:checked')].map(c=>c.value);
+  if(!platforms.length){ alert('Select at least one platform.'); return; }
+  searches.push({ name, keywords, location: document.getElementById('s-location').value.trim(), platforms });
+  saveSearches();
+  closeSearchModal();
+  renderSearchList();
+}
+
+function launchSearch(i){
+  const s = searches[i];
+  s.platforms.forEach(pName=>{
+    const p = PLATFORMS.find(x=>x.name===pName);
+    if(p) window.open(p.url(s.keywords, s.location), '_blank');
+  });
+}
+
+function deleteSearch(i){
+  if(!confirm('Remove this search?')) return;
+  searches.splice(i,1);
+  saveSearches();
+  renderSearchList();
+}
+
+// ─────────────────────────────────────────
+//  RESUME VAULT
+// ─────────────────────────────────────────
+function renderVault(){
+  const grid = document.getElementById('vault-grid');
+  if(!resumes.length){
+    grid.innerHTML = `<div class="col-span-3 empty-state"><div class="empty-state-icon" style="font-size:0;margin-bottom:12px;"><svg width="40" height="40" fill="none" stroke="#d1d5db" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg></div><div class="empty-state-title">No resumes added yet</div><div class="empty-state-desc">Add your resumes to use the match assistant and track which version you send.</div></div>`;
+    return;
+  }
+  grid.innerHTML = resumes.map((r,i)=>`
+    <div class="resume-card">
+      <div class="flex items-start gap-3 mb-3">
+        <div class="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0 text-indigo-500"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></div>
+        <div class="flex-1 min-w-0">
+          <div class="text-[14px] font-semibold text-gray-900">${r.label}</div>
+          ${r.desc?`<div class="text-[12px] text-gray-400 mt-0.5">${r.desc}</div>`:''}
+          <div class="text-[11px] text-gray-300 mt-1">${r.date}</div>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-1.5 mb-4">
+        ${(r.tags||[]).slice(0,5).map(t=>`<span class="text-[11px] font-medium px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full">${t}</span>`).join('')}
+      </div>
+      <div class="flex gap-2 pt-3 border-t border-gray-50">
+        ${r.fileData?`<button class="btn btn-primary btn-sm flex-1" onclick="downloadResume(${i})">↓ Download</button>`:'<button class="btn btn-secondary btn-sm flex-1" disabled>No file</button>'}
+        <button class="btn btn-danger btn-sm" onclick="deleteResume(${i})">×</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openResumeModal(){
+  ['r-label','r-desc','r-tags','r-roles'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('r-file-label').textContent = 'Click to upload resume PDF';
+  selectedFile = null;
+  openModal('resume-modal');
+}
+function closeResumeModal(){ closeModal('resume-modal'); }
+
+function handleFileSelect(input){
+  const f = input.files[0];
+  if(!f) return;
+  selectedFile = f;
+  document.getElementById('r-file-label').textContent = '✓ '+f.name;
+}
+
+function saveResume(){
+  const label = document.getElementById('r-label').value.trim();
+  if(!label){ alert('Please add a label.'); return; }
+  const tags  = document.getElementById('r-tags').value.split(',').map(t=>t.trim()).filter(Boolean);
+  const roles = document.getElementById('r-roles').value.split(',').map(t=>t.trim()).filter(Boolean);
+
+  const commit = (fileData, fileName) => {
+    resumes.push({
+      id: Date.now().toString(), label,
+      desc: document.getElementById('r-desc').value.trim(),
+      tags: [...tags,...roles],
+      keywords: [...tags,...roles,label].join(' ').toLowerCase(),
+      date: new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}),
+      fileData, fileName
+    });
+    saveResumes();
+    closeResumeModal();
+    renderVault();
+  };
+
+  if(selectedFile){
+    const reader = new FileReader();
+    reader.onload = ev => commit(ev.target.result, selectedFile.name);
+    reader.readAsDataURL(selectedFile);
+  } else {
+    commit(null, null);
+  }
+}
+
+function downloadResume(i){
+  const r = resumes[i];
+  if(!r.fileData) return;
+  const a = document.createElement('a');
+  a.href = r.fileData;
+  a.download = r.fileName || r.label+'.pdf';
+  a.click();
+}
+
+function deleteResume(i){
+  if(!confirm('Remove this resume?')) return;
+  resumes.splice(i,1);
+  saveResumes();
+  renderVault();
+}
+
+function matchResume(){
+  const jd = document.getElementById('jd-input').value.toLowerCase();
+  if(!jd.trim()){ alert('Paste a job description first.'); return; }
+  if(!resumes.length){ document.getElementById('match-status').textContent='No resumes in vault.'; return; }
+
+  const scores = resumes.map(r=>{
+    const kws = (r.keywords||'').split(' ').filter(Boolean);
+    const hits = kws.filter(k=>jd.includes(k)).length;
+    return { label:r.label, score: kws.length?Math.round((hits/kws.length)*100):0 };
+  }).sort((a,b)=>b.score-a.score);
+
+  document.getElementById('match-bars').innerHTML = scores.map(s=>`
+    <div class="flex items-center gap-3">
+      <div class="text-[13px] text-gray-600 w-44 truncate" title="${s.label}">${s.label}</div>
+      <div class="flex-1 progress-track"><div class="progress-fill bg-indigo-500" style="width:${s.score}%"></div></div>
+      <div class="text-[12px] font-semibold text-gray-700 w-8 text-right">${s.score}%</div>
+    </div>
+  `).join('');
+
+  const best = scores[0];
+  document.getElementById('match-rec').innerHTML =
+    `<strong>Recommendation:</strong> Use <em class="text-indigo-600">${best.label}</em>${best.score>0?' — '+best.score+'% keyword match.':' — no strong match detected. Consider adding more keyword tags to your resumes.'}`;
+
+  document.getElementById('match-result').classList.remove('hidden');
+  document.getElementById('match-status').textContent='';
+}
+
+// ─────────────────────────────────────────
+//  ANALYTICS
+// ─────────────────────────────────────────
+function renderAnalytics(){
+  const total = jobs.length;
+  const interviews = jobs.filter(j=>j.status==='Interview').length;
+  const offers     = jobs.filter(j=>j.status==='Offer').length;
+  const rejected   = jobs.filter(j=>j.status==='Rejected').length;
+
+  // Stat cards
+  document.getElementById('analytics-stats').innerHTML = [
+    { label:'Total Applications', value:total,   sub:'All time', icon:`<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>`, color:'text-indigo-600 bg-indigo-50' },
+    { label:'Interview Rate',     value:`${pct(interviews,total)}%`, sub:`${interviews} interviews from ${total} apps`, icon:`<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>`, color:'text-yellow-600 bg-yellow-50' },
+    { label:'Offer Rate',         value:`${pct(offers,total)}%`, sub:`${offers} offers received`, icon:`<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`, color:'text-green-600 bg-green-50' },
+  ].map(c=>`
+    <div class="stat-card">
+      <div class="flex items-start justify-between mb-3">
+        <div class="text-[12px] font-semibold uppercase tracking-wide text-gray-400">${c.label}</div>
+        <div class="w-8 h-8 rounded-lg ${c.color} flex items-center justify-center">${c.icon}</div>
+      </div>
+      <div class="text-[32px] font-bold text-gray-900 leading-none mb-1">${c.value}</div>
+      <div class="text-[12px] text-gray-400">${c.sub}</div>
+    </div>
+  `).join('');
+
+  // Timeline chart: applications by month
+  const monthCounts = {};
+  jobs.forEach(j=>{
+    if(!j.dateApplied) return;
+    const key = j.dateApplied.slice(0,7);
+    monthCounts[key] = (monthCounts[key]||0)+1;
+  });
+  const months = Object.keys(monthCounts).sort();
+  const tlCtx = document.getElementById('timeline-chart');
+  if(chartTimeline) chartTimeline.destroy();
+  chartTimeline = new Chart(tlCtx, {
+    type:'line',
+    data:{
+      labels: months.map(m=>new Date(m+'-01').toLocaleDateString('en-US',{month:'short',year:'2-digit'})),
+      datasets:[{ label:'Applications', data:months.map(m=>monthCounts[m]),
+        borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,0.08)',
+        tension:0.4, fill:true, pointBackgroundColor:'#6366f1', pointRadius:4,
+      }]
+    },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{ x:{grid:{display:false},ticks:{font:{size:11}}}, y:{grid:{color:'#f3f4f6'},ticks:{font:{size:11},precision:0}} }
+    }
+  });
+
+  // Status doughnut
+  const stCtx = document.getElementById('status-chart');
+  const counts = {};
+  STATUSES.forEach(s=>counts[s]=0);
+  jobs.forEach(j=>counts[j.status]=(counts[j.status]||0)+1);
+  if(chartStatus) chartStatus.destroy();
+  chartStatus = new Chart(stCtx, {
+    type:'doughnut',
+    data:{
+      labels: STATUSES,
+      datasets:[{ data: STATUSES.map(s=>counts[s]),
+        backgroundColor:['#e5e7eb','#3b82f6','#eab308','#22c55e','#ef4444'],
+        borderWidth:0, hoverOffset:4,
+      }]
+    },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'68%',
+      plugins:{ legend:{ position:'bottom', labels:{ font:{size:12}, boxWidth:10, padding:16 } } }
+    }
+  });
+
+  // Funnel
+  const applied   = jobs.filter(j=>j.status!=='Saved').length || 1;
+  const funnelData = [
+    { label:'Applied',   count:applied,   color:'bg-blue-500' },
+    { label:'Interview', count:interviews, color:'bg-yellow-500' },
+    { label:'Offer',     count:offers,     color:'bg-green-500' },
+  ];
+  document.getElementById('funnel-bars').innerHTML = funnelData.map(f=>`
+    <div>
+      <div class="flex justify-between text-[13px] mb-1.5">
+        <span class="font-medium text-gray-700">${f.label}</span>
+        <span class="text-gray-400">${f.count} <span class="text-gray-300">(${pct(f.count,applied)}%)</span></span>
+      </div>
+      <div class="progress-track h-3">
+        <div class="progress-fill ${f.color}" style="width:${pct(f.count,applied)}%"></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ─────────────────────────────────────────
+//  SETTINGS
+// ─────────────────────────────────────────
+function renderSettings(){
+  document.getElementById('stale-days-input').value = settings.staleDays || 14;
+}
+
+function clearAllJobs(){
+  if(!confirm('Are you sure? All applications will be permanently deleted.')) return;
+  jobs = [];
+  saveJobs();
+  updateBadges();
+  alert('All applications cleared.');
+}
+
+function exportCSV(){
+  const headers = ['Company','Role','Status','Priority','Location','Salary','Date Applied','Last Contact','Next Step','Resume Used','URL','Notes'];
+  const rows = jobs.map(j=>[j.company,j.role,j.status,j.priority,j.location,j.salary,j.dateApplied,j.lastContact,j.nextStep,j.resumeLabel,j.url,j.notes]
+    .map(v=>`"${(v||'').replace(/"/g,'""')}"`).join(','));
+  const csv = [headers.join(','),...rows].join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download = `hireflow-applications-${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+}
+
+// ─────────────────────────────────────────
+//  MODAL HELPERS
+// ─────────────────────────────────────────
+function openModal(id){
+  const m = document.getElementById(id);
+  m.style.display='flex';
+  requestAnimationFrame(()=>m.classList.add('open'));
+}
+function closeModal(id){
+  const m = document.getElementById(id);
+  m.classList.remove('open');
+  setTimeout(()=>m.style.display='none', 200);
+}
+function closeOnBackdrop(e, id){
+  if(e.target.id===id) closeModal(id);
+}
+
+// ─────────────────────────────────────────
+//  MOBILE SIDEBAR
+// ─────────────────────────────────────────
+function openSidebar(){
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebar-overlay').classList.add('open');
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
+}
+
+// ─────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────
+(function init(){
+  // Hide all modals initially
+  ['job-modal','search-modal','resume-modal'].forEach(id=>{
+    const el = document.getElementById(id);
+    el.style.display='none';
+  });
+
+  // Hide view toggle on non-list pages by default (dashboard)
+  document.getElementById('view-toggle').style.display='none';
+
+  // Initial render
+  updateBadges();
+  renderDashboard();
+})();
+</script>
+</body>
+</html>
